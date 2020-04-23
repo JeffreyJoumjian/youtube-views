@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
-from helper import *    
+from helper import *
 
 # df = pd.read_csv("orig_data.csv");
-df = pd.read_csv("dataset.csv"); # title length scaled
-df = df.dropna() # only drops 4 columns
+df = pd.read_csv("dataset.csv").dropna().sample(n=100000, replace=False,
+                                                random_state=seed, axis=0)  # title length scaled
+# only drops 4 columns
 
-X = df.loc[:, df.columns != 'views'] # these are the initial preprocessed features
-y = np.log(df['views']) # this is the output we want to predict
+# these are the initial preprocessed features
+X = df.loc[:, df.columns != 'views']
+y = np.log10(df['views'])  # this is the output we want to predict
+# y = df['views']  # this is the output we want to predict
 
 # splitting into train and test
-x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=seed)
-
-
-
+x_train, x_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=seed)
 
 
 print("preparing training:")
@@ -23,17 +24,17 @@ print("preparing test:")
 x_test = prepareTestData(x_test, prepData[1])
 
 # doLinearRegression(x_train, y_train, x_test, y_test)
-# doRidgeRegression(x_train, y_train, x_test, y_test)
-
-
-# note this is using cross validation so the preparation should be done inside the function
-# i'm not sure how to do that so for now it's not like that
 # doSGDRegression(x_train, y_train, x_test, y_test)
+# doRidgeRegression(x_train, y_train, x_test, y_test)
+# doRidgeCV(x_train, y_train, x_test, y_test)
+# doKNNRegression(x_train, y_train, x_test, y_test)
+# dKNNGridSearch(x_train, y_train, x_test, y_test)
+# doRegressionTree(x_train, y_train, x_test, y_test)
+doNeuralNetwork(x_train, y_train, x_test, y_test)
 
+# BEST SO FAR
 
-
-# BEST SO FAR 
-
+# RIDGE
 # Time to train model: 7 min
 # R^2: 0.58
 # 1.31
@@ -43,26 +44,7 @@ x_test = prepareTestData(x_test, prepData[1])
 # RMSE: 1.27
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# TREE
+# Time to train model: 13.21 min
+# R^2: 0.7
+# RMSE: 1.27
