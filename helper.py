@@ -365,7 +365,7 @@ def doNeuralCV(x_train, y_train, x_test, y_test):
 
     estimator = MLPRegressor(
         hidden_layer_sizes=(100,),
-        alpha=0.0001,
+        alpha=0.1,
         max_iter=1000,
         # n_iter_no_change=20,
         solver='adam',  # try lbfgs
@@ -412,6 +412,20 @@ def doNeuralCV(x_train, y_train, x_test, y_test):
 # R^2: 0.84
 # testing model:
 # RMSE: 1.36
+
+# adam on large
+# Iteration 106, loss = 0.04328406
+# Iteration 107, loss = 0.04286257
+# Iteration 108, loss = 0.04292439
+# Iteration 109, loss = 0.04278657
+# Iteration 110, loss = 0.04282519
+# Iteration 111, loss = 0.04292304
+# Iteration 112, loss = 0.04271347
+# Training loss did not improve more than tol=0.000100 for 10 consecutive epochs. Stopping.
+# Time to train model: 60.95 min
+# R^2: 0.89
+# testing model:
+# RMSE: 0.55
 
 # using lbfgs on small
 # Time to train model: 2.37 min
