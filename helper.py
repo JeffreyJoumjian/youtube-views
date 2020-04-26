@@ -4,9 +4,8 @@ from sklearn.linear_model import LinearRegression, Ridge, SGDRegressor
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score, cross_val_predict, KFold
 from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from sklearn import metrics
+from sklearn import metrics, neighbors
 from sklearn.tree import DecisionTreeRegressor
-from sklearn import neighbors
 from math import sqrt
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -15,10 +14,12 @@ import numpy as np
 import time
 import re
 
+
 seed = 123
-_verbose = False
+_verbose = False  # setting this to true will print the learned vocabulary for each text field
 
 
+# this function is used to clean the whitespace and select the words
 def tokenizer(text):
     if text:
         result = re.findall('[a-z0-9]{2,}', text.lower())
@@ -27,53 +28,59 @@ def tokenizer(text):
     return result
 
 
-def vectorize(df, prop, vectorizer, train=True, prints=False):
+# returns the learned vocabulary and the vectorizer for the specified feature
+def vectorize(df, feature, vectorizer, train=True, verbose=False):
 
     if(train):
         start = time.time()
-        tfidf = vectorizer.fit_transform(df[prop])
+        tfidf = vectorizer.fit_transform(df[feature])
         end = time.time()
         print('Time to train %s vectorizer and transform training text: %0.2fs' % (
-            prop, (end - start)))
+            feature, (end - start)))
 
-        if(prints):
+        if(verbose):
             print(
                 '%s\n' % (sorted(vectorizer.vocabulary_.items(), key=lambda item: item[1])))
 
     else:
         start = time.time()
-        tfidf = vectorizer.transform(df[prop])
+        tfidf = vectorizer.transform(df[feature])
         end = time.time()
         print('Time to transform testing %s text: %0.2fs' %
-              (prop, (end - start)))
+              (feature, (end - start)))
 
     return (tfidf, vectorizer)
 
 
+# selects all the features
+# removes text columns and adds their idf value columns instead
+# prints the shape of the data after each addition to measure the added features
+# returns the newly generated dataframe
 def getFeatures(df, vectorizers, vectorized):
     df = df.iloc[:, 3:]
     for vectorizer, vector in zip(vectorizers, vectorized):
-        df1 = pd.DataFrame(vector.toarray(), index=df.index,
-                           columns=vectorizer.get_feature_names())
-        df = pd.concat([df, df1], axis=1)
+        idfColumn = pd.DataFrame(vector.toarray(), index=df.index,
+                                 columns=vectorizer.get_feature_names())
+        df = pd.concat([df, idfColumn], axis=1)
         print(df.shape)
 
     return df
 
 
-# NOTE: Channel title barely affecting model
+# Vectorizes the training text data
+# => returns the modifed training df to be used in the algorithms
+# => returns the vectorizer to vectorize the test data later
 def prepareTrainData(df):
 
-    start = time.time()
-
+    # lower min_df could be better but requires stronger computing power (>16GB RAM)
     # min_df = 0.0005 is the best => the minimum frequency percentage to mark the word/clause as valuable
     # max_df => the maximum frequency percentage to mark the word/clause as valuable
 
-    # create vectorizers
+    # create vectorizers to fit and transform the text data
     title_vectorizer = TfidfVectorizer(
         tokenizer=tokenizer,
         token_pattern=r'\w{2,}',
-        min_df=0.0005,
+        min_df=0.01,
         max_df=0.6,
         smooth_idf=False,
         sublinear_tf=False,
@@ -101,7 +108,7 @@ def prepareTrainData(df):
     tags_vectorizer = TfidfVectorizer(
         tokenizer=tokenizer,
         token_pattern=r'\w{2,}',
-        min_df=0.0005,
+        min_df=0.01,
         max_df=0.6,
         smooth_idf=False,
         sublinear_tf=False,
@@ -119,13 +126,16 @@ def prepareTrainData(df):
     ]
 
     # vectorize the features that need vectorizing
+    start = time.time()
+
     print("vectorizing train title:")
-    title_tfidf = vectorize(df, "title", title_vectorizer, prints=_verbose)[0]
+    title_tfidf = vectorize(df, "title", title_vectorizer, verbose=_verbose)[0]
     print("vectorizing train channel_title:")
     channel_tfidf = vectorize(
-        df, "channel_title", channel_vectorizer, prints=_verbose)[0]
+        df, "channel_title", channel_vectorizer, verbose=_verbose)[0]
     print("vectorizing train tags:")
-    tags_tfidf = vectorize(df, "tags", tags_vectorizer, prints=_verbose)[0]
+    tags_tfidf = vectorize(df, "tags", tags_vectorizer, verbose=_verbose)[0]
+
     vectorized = [
         title_tfidf,
         channel_tfidf,
@@ -135,12 +145,12 @@ def prepareTrainData(df):
     df = getFeatures(df, vectorizers, vectorized)
 
     end = time.time()
-
     print('Time to mine text data: %0.2f min' % ((end - start)/60))
 
     return (df, vectorizers)
 
 
+# Vectorizes the testing text data => returns modifed testing df to be used in the algorithms
 def prepareTestData(df, vectorizers):
     # vectorize the features that need vectorizing
     print("vectorizing test title")
@@ -150,6 +160,7 @@ def prepareTestData(df, vectorizers):
         df, "channel_title", vectorizers[1], train=False)[0]
     print("vectorizing test tags")
     tags_tfidf = vectorize(df, "tags", vectorizers[2], train=False)[0]
+
     vectorized = [
         title_tfidf,
         channel_tfidf,
@@ -161,14 +172,18 @@ def prepareTestData(df, vectorizers):
     return df
 
 
-def doLinearRegression(x_train, y_train, x_test, y_test):
+# prints model accuracy and other metrics
+def getModelTrainTestInfo(model, x_train, y_train, x_test, y_test):
+
+    # training info
     print("training model:")
     start = time.time()
-    model = LinearRegression(n_jobs=-1).fit(x_train, y_train)
+    model.fit(x_train, y_train)
     end = time.time()
-    print("R^2: %0.2f" % model.score(x_train, y_train))
     print('Time to train model: %0.2f min' % ((end - start)/60))
+    print("R^2: %0.2f" % model.score(x_train, y_train))
 
+    # testing and metrics
     print("testing model:")
     y_pred = model.predict(x_test)
     mae = mean_absolute_error(y_test, y_pred)
@@ -176,27 +191,19 @@ def doLinearRegression(x_train, y_train, x_test, y_test):
     print("RMSE: %0.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
 
     return model
+
+
+def doLinearRegression(x_train, y_train, x_test, y_test):
+
+    model = LinearRegression(n_jobs=3)  # model to be used
+    return getModelTrainTestInfo(model, x_train, y_train, x_test, y_test)
 
 
 def doRidgeRegression(x_train, y_train, x_test, y_test):
 
-    model = Ridge(alpha=1, random_state=seed)
-    print("training model:")
+    model = Ridge(alpha=1, random_state=seed)  # model to be used
 
-    start = time.time()
-    model.fit(x_train, y_train)
-    end = time.time()
-
-    print('Time to train model: %0.2fmin' % ((end - start)/60))
-    print("R^2: %0.2f" % model.score(x_train, y_train))
-
-    print("testing model:")
-    y_pred = model.predict(x_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    print("MAE: {:.3f}".format(mae))
-    print("RMSE: %0.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
-
-    return model
+    return getModelTrainTestInfo(model, x_train, y_train, x_test, y_test)
 
 
 def doRidgeCV(x_train, y_train, x_test, y_test):
@@ -211,31 +218,16 @@ def doRidgeCV(x_train, y_train, x_test, y_test):
                       cv=5,
                       verbose=3)
 
-    print("training model:")
-    start = time.time()
-    gs.fit(x_train, y_train)
-    end = time.time()
-    print('Time to train model: %0.2fmin' % ((end - start)/60))
+    gs = getModelTrainTestInfo(gs, x_train, y_train, x_test, y_test)
     model = gs.best_estimator_
     print(gs.best_params_)
     print(gs.best_score_)
-    print("R^2: %0.2f" % model.score(x_train, y_train))
-
-    print("testing model:")
-    y_pred = model.predict(x_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    print("MAE: {:.3f}".format(mae))
-    print("RMSE: %0.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
 
     return model
 
+# also includes the cross validation of linear and regularized linear regressions
 
-# RESULTS
-# Time to train model: 11.42min
-# {'alpha': 0.0002, 'penalty': 'l1'}
-# -0.40845238240915027
-# testing model:
-# RMSE: 0.63
+
 def doSGDRegression(x_train, y_train, x_test, y_test, cv=False):
 
     model = SGDRegressor(loss='squared_loss', penalty='l2',
@@ -248,20 +240,11 @@ def doSGDRegression(x_train, y_train, x_test, y_test, cv=False):
                       n_jobs=3,
                       cv=5,
                       verbose=3)
-    start = time.time()
-    gs.fit(x_train, y_train)
-    end = time.time()
-    print('Time to train model: %0.2fmin' % ((end - start)/60))
+
+    gs = getModelTrainTestInfo(gs, x_train, y_train, x_test, y_test)
     model = gs.best_estimator_
     print(gs.best_params_)
     print(gs.best_score_)
-    print("R^2: %0.2f" % model.score(x_train, y_train))
-
-    print("testing model:")
-    y_pred = model.predict(x_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    print("MAE: {:.3f}".format(mae))
-    print("RMSE: %0.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
 
     return model
 
@@ -272,7 +255,7 @@ def doKNNRegression(x_train, y_train, x_test, y_test):
     for K in range(1, 11):
         print("K =", K)
 
-        model = neighbors.KNeighborsRegressor(n_neighbors=K)
+        model = neighbors.KNeighborsRegressor(n_neighbors=K, n_jobs=3)
 
         print("fitting the model")
         start = time.time()
@@ -305,24 +288,22 @@ def doKNNGridSearch(x_train, y_train, x_test, y_test):
               'leaf_size': [1, 3, 5],
               'algorithm': ['auto', 'kd_tree', 'ball_tree', 'brute'],
               'metric': ['minkowski', 'euclidean'],
-              'n_jobs': [-1]}
+              'n_jobs': [3]}
 
     model = neighbors.KNeighborsRegressor()
 
     gs = GridSearchCV(estimator=model,
                       param_grid=params,
                       scoring='neg_mean_squared_error',
-                      n_jobs=3,
+                      #   n_jobs=3,
                       cv=5,
                       verbose=3)
-    start = time.time()
-    gs.fit(x_train, y_train)
-    end = time.time()
-    print('Time to train model: %0.2f min' % ((end - start)/60))
+
+    gs = getModelTrainTestInfo(gs, x_train, y_train, x_test, y_test)
+
     model = gs.best_estimator_
     print(gs.best_score_)
     print(gs.best_params_)
-    print("R^2: %0.2f" % model.score(x_train, y_train))
 
     # cross validation
     r2_scores = cross_val_score(
@@ -344,20 +325,11 @@ def doKNNGridSearch(x_train, y_train, x_test, y_test):
 
 
 def doRegressionTree(x_train, y_train, x_test, y_test):
-    print("training model:")
-    start = time.time()
-    model = DecisionTreeRegressor(min_samples_split=4, random_state=seed).fit(
-        x_train, y_train)  # fit the model
-    end = time.time()
-    print('Time to train model: %0.2f min' % ((end - start)/60))
-    print("R^2: %0.2f" % model.score(x_train, y_train))
 
-    print("testing model:")
-    y_pred = model.predict(x_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    print("MAE: {:.3f}".format(mae))
-    print("RMSE: %0.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
+    model = DecisionTreeRegressor(
+        max_depth=150, min_samples_split=4, random_state=seed)
 
+    model = getModelTrainTestInfo(model, x_train, y_train, x_test, y_test)
     print("depth: ", model.get_depth())
 
     return model
@@ -367,13 +339,14 @@ def doRegressionTreeGridSearch(x_train, y_train, x_test, y_test):
     # Hyperparameter tuning using GridSearch
     print("Hyperparameter tuning using GridSearch")
     regressor = DecisionTreeRegressor(random_state=123)
-    param_grid = {"criterion": ["mse", "mae"],
+    param_grid = {"criterion": ["mse"],  # mae is stalling the algorithm for some reason
                   "min_samples_split": [10, 20, 40],
-                  "max_depth": [50, 100, 200],
+                  "max_depth": [10, 50, 100, 200],
                   "min_samples_leaf": [20, 40, 100],
-                  "max_leaf_nodes": [5, 20, 100],
+                  "max_leaf_nodes": [25, 50, 100],
                   }
-    grid_cv_dtm = GridSearchCV(regressor, param_grid, cv=5)
+    grid_cv_dtm = GridSearchCV(
+        regressor, param_grid, n_jobs=3, verbose=3, cv=5)
     grid_cv_dtm.fit(x_train, y_train)
     print("R-Squared::{}".format(grid_cv_dtm.best_score_))
     print("Best Hyperparameters::\n{}".format(grid_cv_dtm.best_params_))
@@ -411,7 +384,7 @@ def doRegressionTreeGridSearch(x_train, y_train, x_test, y_test):
     print("MSE for each fold")
     print(mse_scores)
     print("avg R-squared::{:.3f}".format(np.mean(r2_scores)))
-    print("MSE::{:.3f}".format(np.mean(mse_scores)))
+    print("avg MSE::{:.3f}".format(np.mean(mse_scores)))
 
     # Test dataset evaluation
     print("Test dataset evaluation")
@@ -441,20 +414,7 @@ def doNeuralNetwork(x_train, y_train, x_test, y_test):
         random_state=seed,
         verbose=True)
 
-    print("training model:")
-    start = time.time()
-    model.fit(x_train, y_train)
-    end = time.time()
-    print('Time to train model: %0.2f min' % ((end - start)/60))
-    print("R^2: %0.2f" % model.score(x_train, y_train))
-
-    print("testing model:")
-    y_pred = model.predict(x_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    print("MAE: {:.3f}".format(mae))
-    print("RMSE: %0.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
-
-    return model
+    return getModelTrainTestInfo(model, x_train, y_train, x_test, y_test)
 
 
 def doNeuralCV(x_train, y_train, x_test, y_test):
@@ -462,19 +422,22 @@ def doNeuralCV(x_train, y_train, x_test, y_test):
     estimator = MLPRegressor(
         hidden_layer_sizes=(100,),
         alpha=0.0001,
-        max_iter=1000,
+        max_iter=200,
         # n_iter_no_change=20,
-        solver='adam',  # try lbfgs
-        learning_rate='adaptive',  # try adaptive
+        solver='adam',  # lbfgs for small datasets, adam for large datasets
+        # results in report use 'adaptive' but 'constant' may perform better depending on training set
+        learning_rate='adaptive',
         learning_rate_init=0.001,
         random_state=seed,
-        verbose=True)
+        verbose=3
+    )
 
     params = {
-        'solver': ['adam', 'lbfgs', 'sgd'],
+        'hidden_layer_sizes': [(50,), (100,), (150,)],
+        'solver': ['adam', 'lbfgs'],
         'learning_rate': ['constant', 'adaptive'],
         'alpha': [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 0.1],
-        'max_iter': [200, 500, 1000]
+        'max_iter': [50, 100, 150]
     }
 
     model = GridSearchCV(
@@ -483,36 +446,7 @@ def doNeuralCV(x_train, y_train, x_test, y_test):
         scoring='neg_mean_squared_error',
         n_jobs=3,
         cv=5,
-        verbose=True
+        verbose=3
     )
 
-    print("training model:")
-    start = time.time()
-    model.fit(x_train, y_train)
-    end = time.time()
-    print('Time to train model: %0.2f min' % ((end - start)/60))
-    print("R^2: %0.2f" % model.score(x_train, y_train))
-
-    print("testing model:")
-    y_pred = model.predict(x_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    print("MAE: {:.3f}".format(mae))
-    print("RMSE: %0.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
-
-    return model
-
-# using adam on small
-# Iteration 64, loss = 0.06638185
-# Iteration 65, loss = 0.06426020
-# Iteration 66, loss = 0.06538583
-# Training loss did not improve more than tol=0.000100 for 10 consecutive epochs. Stopping.
-# Time to train model: 3.23 min
-# R^2: 0.84
-# testing model:
-# RMSE: 1.36
-
-# using lbfgs on small
-# Time to train model: 2.37 min
-# R^2: 0.95
-# testing model:
-# RMSE: 1.16
+    return getModelTrainTestInfo(model, x_train, y_train, x_test, y_test)

@@ -1,50 +1,56 @@
 # -*- coding: utf-8 -*-
 from helper import *
 
-# df = pd.read_csv("orig_data.csv");
-df = pd.read_csv("dataset.csv").dropna().sample(n=100000, replace=False,
-                                                random_state=seed, axis=0)  # title length scaled
-# only drops 4 columns
 
-# these are the initial preprocessed features
+# General Remarks
+# 1) We are using a 80-training 20-testing split
+# 2) Adding more text features to the model by decreasing min_df increase the model accuracy
+# 3) Decreasing min_df too much will require significantly more ram (16 GB)
+
+# Recommended Settings
+# 1) best accuracy =>           n = 100,000   min_df = 0.0005
+# 1) fast - okay accuracy =>    n = 20,000    min_df = 0.005
+# 1) fast results =>            n = 10,000    min_df = 0.01
+
+# only drops 4 columns due to missing channel title name
+# title length scaled between [0.00, 1.00]
+df = pd.read_csv("dataset.csv").dropna().sample(n=10000, replace=False,
+                                                random_state=seed, axis=0)
+
+# selects all features except views which is the response
 X = df.loc[:, df.columns != 'views']
-y = np.log10(df['views'])  # this is the output we want to predict
-# y = df['views']  # this is the output we want to predict
 
-# splitting into train and test
+# views is the response we will be predicting. It is log10 transformed for faster and better performance
+y = np.log10(df['views'])
+
 x_train, x_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=seed)
 
 
+# vectorize the text features using TFIDF bag of words and add the new columns to the training data
 print("preparing training:")
+# prepareTrainData() returns the modified training dataset as well as the trasnformers to be used for the testing data
 prepData = prepareTrainData(x_train)
 x_train = prepData[0]
 
+# vectorize the text features using TFIDF bag of words and add the new columns to the testing data
 print("preparing test:")
+# transform the test data using the transformers which were fitted on the training data.
 x_test = prepareTestData(x_test, prepData[1])
+
+# Calling the algorithms. Individual methods and cross validation methods are separated
 
 # doLinearRegression(x_train, y_train, x_test, y_test)
 # doSGDRegression(x_train, y_train, x_test, y_test)
+
 # doRidgeRegression(x_train, y_train, x_test, y_test)
 # doRidgeCV(x_train, y_train, x_test, y_test)
+
 # doKNNRegression(x_train, y_train, x_test, y_test)
-# dKNNGridSearch(x_train, y_train, x_test, y_test)
-doRegressionTree(x_train, y_train, x_test, y_test)
+# doKNNGridSearch(x_train, y_train, x_test, y_test)
+
+# doRegressionTree(x_train, y_train, x_test, y_test)
+# doRegressionTreeGridSearch(x_train, y_train, x_test, y_test)
+
 # doNeuralNetwork(x_train, y_train, x_test, y_test)
-
-# BEST SO FAR
-
-# RIDGE
-# Time to train model: 7 min
-# R^2: 0.58
-# 1.31
-
-# Time to train model: 13.21 min
-# R^2: 0.61
-# RMSE: 1.27
-
-
-# TREE
-# Time to train model: 13.21 min
-# R^2: 0.7
-# RMSE: 1.27
+doNeuralCV(x_train, y_train, x_test, y_test)
