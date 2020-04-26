@@ -29,8 +29,8 @@ x_test = prepareTestData(x_test, prepData[1])
 # doRidgeCV(x_train, y_train, x_test, y_test)
 # doKNNRegression(x_train, y_train, x_test, y_test)
 # dKNNGridSearch(x_train, y_train, x_test, y_test)
-# doRegressionTree(x_train, y_train, x_test, y_test)
-doNeuralNetwork(x_train, y_train, x_test, y_test)
+doRegressionTree(x_train, y_train, x_test, y_test)
+# doNeuralNetwork(x_train, y_train, x_test, y_test)
 
 # BEST SO FAR
 

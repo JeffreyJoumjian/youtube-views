@@ -1,0 +1,21 @@
+Linear Regression (100k)
+Time to train model: 21.40 min
+R^2: 0.65
+testing model:
+MAE:790449170.247
+RMSE: 23111109481.89
+
+Ridge Regression (100k)
+Time to train model: 2.37min
+R^2: 0.65
+testing model:
+MAE:0.450
+RMSE: 0.60
+
+Tree Regression (100k) (max_depth=150)
+Time to train model: 3.96 min
+R^2: 0.91
+testing model:
+MAE:0.398
+RMSE: 0.58
+depth:  150
