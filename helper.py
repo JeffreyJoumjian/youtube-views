@@ -281,6 +281,9 @@ def doKNNRegression(x_train, y_train, x_test, y_test):
         print('Time to train model: %0.2f min' % ((end - start)/60))
         print("R^2: %0.2f" % model.score(x_train, y_train))
 
+        print("testing model:")
+        y_pred = model.predict(x_test)
+
         print("calculating error: ")
         error = sqrt(mean_squared_error(y_test, y_pred))  # calculate rmse
         rmse_val.append(error)  # store rmse values
