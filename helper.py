@@ -80,7 +80,7 @@ def prepareTrainData(df):
     title_vectorizer = TfidfVectorizer(
         tokenizer=tokenizer,
         token_pattern=r'\w{2,}',
-        min_df=0.01,
+        min_df=0.1,
         max_df=0.6,
         smooth_idf=False,
         sublinear_tf=False,
@@ -108,7 +108,7 @@ def prepareTrainData(df):
     tags_vectorizer = TfidfVectorizer(
         tokenizer=tokenizer,
         token_pattern=r'\w{2,}',
-        min_df=0.01,
+        min_df=0.1,
         max_df=0.6,
         smooth_idf=False,
         sublinear_tf=False,
@@ -338,8 +338,8 @@ def doRegressionTree(x_train, y_train, x_test, y_test):
 def doRegressionTreeGridSearch(x_train, y_train, x_test, y_test):
     # Hyperparameter tuning using GridSearch
     print("Hyperparameter tuning using GridSearch")
-    regressor = DecisionTreeRegressor(random_state=123)
-    param_grid = {"criterion": ["mse"],  # mae is stalling the algorithm for some reason
+    regressor = DecisionTreeRegressor(random_state=seed)
+    param_grid = {"criterion": ["mse", "mae"],  # mae is stalling the algorithm for some reason
                   "min_samples_split": [10, 20, 40],
                   "max_depth": [10, 50, 100, 200],
                   "min_samples_leaf": [20, 40, 100],
@@ -436,7 +436,7 @@ def doNeuralCV(x_train, y_train, x_test, y_test):
         'hidden_layer_sizes': [(50,), (100,), (150,)],
         'solver': ['adam', 'lbfgs'],
         'learning_rate': ['constant', 'adaptive'],
-        'alpha': [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 0.1],
+        'alpha': [1e-4, 1e-2, 5e-2, 0.1],
         'max_iter': [50, 100, 150]
     }
 
@@ -449,4 +449,8 @@ def doNeuralCV(x_train, y_train, x_test, y_test):
         verbose=3
     )
 
-    return getModelTrainTestInfo(model, x_train, y_train, x_test, y_test)
+    model = getModelTrainTestInfo(model, x_train, y_train, x_test, y_test)
+    print(model.best_score_)
+    print(model.best_params_)
+
+    return model
